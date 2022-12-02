@@ -7,12 +7,12 @@ import (
 	"github.com/yindaheng98/execlock"
 )
 
-type ClientStreamFactory interface {
-	NewClientStream(ctx context.Context) (stream.ClientStream[Request, Status], error)
+type ClientStreamFactory[S Status] interface {
+	NewClientStream(ctx context.Context) (stream.ClientStream[Request, S], error)
 }
 
-type Client struct {
-	*stream.Client[Request, Status]
+type Client[S Status] struct {
+	*stream.Client[Request, S]
 	ctxTop    context.Context
 	cancelTop context.CancelFunc
 
@@ -25,16 +25,16 @@ type Client struct {
 	Logger *logrus.Logger
 }
 
-func NewClient(factory ClientStreamFactory) *Client {
+func NewClient[S Status](factory ClientStreamFactory[S]) *Client[S] {
 	ctx, cancal := context.WithCancel(context.Background())
-	c := &Client{
-		Client:         stream.NewClient[Request, Status](factory),
+	c := &Client[S]{
+		Client:         stream.NewClient[Request, S](factory),
 		ctxTop:         ctx,
 		cancelTop:      cancal,
 		sendStatusExec: &execlock.SingleLatestExec{},
 		Logger:         logrus.StandardLogger(),
 	}
-	c.OnMsgRecv(func(status Status) {
+	c.OnMsgRecv(func(status S) {
 		if c.OnStatusRecv != nil {
 			c.OnStatusRecv(status)
 		}
@@ -43,8 +43,8 @@ func NewClient(factory ClientStreamFactory) *Client {
 }
 
 // SendReport send the report, maybe lose when cannot connect
-func (c *Client) SendReport(report Report) {
-	c.DoWithClient(func(client stream.ClientStream[Request, Status]) error {
+func (c *Client[S]) SendReport(report Report) {
+	c.DoWithClient(func(client stream.ClientStream[Request, S]) error {
 		err := client.Send(&RequestReport{Report: report})
 		if err != nil {
 			c.Logger.Errorf("Report send error: %+v", err)
@@ -55,7 +55,7 @@ func (c *Client) SendReport(report Report) {
 }
 
 // SendStatus send the Status, if there is a new status should be send, the last send will be canceled
-func (c *Client) SendStatus(status Status) {
+func (c *Client[S]) SendStatus(status S) {
 	c.sendStatusExec.Do(func(ctx context.Context) {
 		for {
 			select {
@@ -65,7 +65,7 @@ func (c *Client) SendStatus(status Status) {
 				return
 			default:
 			}
-			ok := c.DoWithClient(func(client stream.ClientStream[Request, Status]) error {
+			ok := c.DoWithClient(func(client stream.ClientStream[Request, S]) error {
 				err := client.Send(&RequestStatus{Status: status})
 				if err != nil {
 					c.Logger.Errorf("Status send error: %+v", err)
