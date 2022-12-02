@@ -11,7 +11,7 @@ type ClientStreamFactory[S Status] interface {
 	NewClientStream(ctx context.Context) (stream.ClientStream[Request, S], error)
 }
 
-type Client[S Status] struct {
+type Client[S Status, R Report] struct {
 	*stream.Client[Request, S]
 	ctxTop    context.Context
 	cancelTop context.CancelFunc
@@ -25,9 +25,9 @@ type Client[S Status] struct {
 	Logger *logrus.Logger
 }
 
-func NewClient[S Status](factory ClientStreamFactory[S]) *Client[S] {
+func NewClient[S Status, R Report](factory ClientStreamFactory[S]) *Client[S, R] {
 	ctx, cancal := context.WithCancel(context.Background())
-	c := &Client[S]{
+	c := &Client[S, R]{
 		Client:         stream.NewClient[Request, S](factory),
 		ctxTop:         ctx,
 		cancelTop:      cancal,
@@ -43,7 +43,7 @@ func NewClient[S Status](factory ClientStreamFactory[S]) *Client[S] {
 }
 
 // SendReport send the report, maybe lose when cannot connect
-func (c *Client[S]) SendReport(report Report) {
+func (c *Client[S, R]) SendReport(report R) {
 	c.DoWithClient(func(client stream.ClientStream[Request, S]) error {
 		err := client.Send(&RequestReport{Report: report})
 		if err != nil {
@@ -54,8 +54,8 @@ func (c *Client[S]) SendReport(report Report) {
 	})
 }
 
-// SendStatus send the Status, if there is a new status should be send, the last send will be canceled
-func (c *Client[S]) SendStatus(status S) {
+// SendStatus send the Status, if there is a new status should be sent, the last send will be canceled
+func (c *Client[S, R]) SendStatus(status S) {
 	c.sendStatusExec.Do(func(ctx context.Context) {
 		for {
 			select {
