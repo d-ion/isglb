@@ -3,7 +3,6 @@ package isglb
 import (
 	"context"
 	"github.com/d-ion/stream"
-	"github.com/sirupsen/logrus"
 	"github.com/yindaheng98/execlock"
 )
 
@@ -21,8 +20,6 @@ type Client[S Status, R Report] struct {
 	cancelLast context.CancelFunc
 
 	OnStatusRecv func(s Status)
-
-	Logger *logrus.Logger
 }
 
 func NewClient[S Status, R Report](factory ClientStreamFactory[S]) *Client[S, R] {
@@ -32,7 +29,6 @@ func NewClient[S Status, R Report](factory ClientStreamFactory[S]) *Client[S, R]
 		ctxTop:         ctx,
 		cancelTop:      cancal,
 		sendStatusExec: &execlock.SingleLatestExec{},
-		Logger:         logrus.StandardLogger(),
 	}
 	c.OnMsgRecv(func(status S) {
 		if c.OnStatusRecv != nil {
@@ -47,7 +43,7 @@ func (c *Client[S, R]) SendReport(report R) {
 	c.DoWithClient(func(client stream.ClientStream[Request, S]) error {
 		err := client.Send(&RequestReport{Report: report})
 		if err != nil {
-			c.Logger.Errorf("Report send error: %+v", err)
+			log.Errorf("Report send error: %+v", err)
 			return err
 		}
 		return nil
@@ -68,7 +64,7 @@ func (c *Client[S, R]) SendStatus(status S) {
 			ok := c.DoWithClient(func(client stream.ClientStream[Request, S]) error {
 				err := client.Send(&RequestStatus{Status: status})
 				if err != nil {
-					c.Logger.Errorf("Status send error: %+v", err)
+					log.Errorf("Status send error: %+v", err)
 					return err
 				}
 				return nil

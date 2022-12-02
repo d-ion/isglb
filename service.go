@@ -4,7 +4,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	"github.com/yindaheng98/execlock"
 	"github.com/yindaheng98/setmap"
 )
@@ -23,8 +22,6 @@ type Service struct {
 
 	sendChs   map[ServerConn]chan Status
 	sendChsMu *sync.RWMutex
-
-	Logger *logrus.Logger
 }
 
 func NewService(alg Algorithm) *Service {
@@ -36,7 +33,6 @@ func NewService(alg Algorithm) *Service {
 		recvChMu:  execlock.NewSingleExec(),
 		sendChs:   make(map[ServerConn]chan Status),
 		sendChsMu: &sync.RWMutex{},
-		Logger:    logrus.StandardLogger(),
 	}
 }
 
@@ -70,8 +66,8 @@ func (isglb *Service) Sync(sig ServerConn) error {
 		isglb.sendChsMu.Unlock()
 	}(isglb, skey)
 
-	go routineStatusSend(sig, sendCh, isglb.Logger) //start message sending
-	isglb.recvChMu.Do(isglb.routineStatusRecv)      // Do not start again
+	go routineStatusSend(sig, sendCh)          //start message sending
+	isglb.recvChMu.Do(isglb.routineStatusRecv) // Do not start again
 
 	for {
 		req, err := sig.Recv() // Receive a Request
@@ -79,7 +75,7 @@ func (isglb *Service) Sync(sig ServerConn) error {
 			if err == io.EOF {
 				return nil
 			}
-			isglb.Logger.Errorf("SyncRequest receive error %d", err)
+			log.Errorf("SyncRequest receive error %d", err)
 			return err
 		}
 		// Push to receive channel
@@ -122,10 +118,10 @@ func (isglb *Service) routineStatusRecv() {
 					WhereToSend.RemoveKey(nid)
 					if lastStatus, ok := latestStatus[nid]; ok {
 						delete(latestStatus, nid)
-						isglb.Logger.Debugf("Deleted a Status because its sig exit: %s", lastStatus.String())
+						log.Debugf("Deleted a Status because its sig exit: %s", lastStatus.String())
 						recvCount++ // count the message
 					} else {
-						isglb.Logger.Debugf("Status to be deleted not exists: %s", nid)
+						log.Debugf("Status to be deleted not exists: %s", nid)
 					}
 				}
 				WhereToSend.RemoveValue(deletedSig)
@@ -137,20 +133,20 @@ func (isglb *Service) routineStatusRecv() {
 			//category and save messages
 			switch request := msg.request.(type) {
 			case *RequestReport:
-				isglb.Logger.Debugf("Received a QualityReport: %s", request.Report.String())
+				log.Debugf("Received a QualityReport: %s", request.Report.String())
 				if _, ok = savedReports[request.Report.String()]; !ok { //filter out deprecated report
 					savedReports[request.Report.String()] = request.Report.Clone() // Save the copy
 					recvCount++                                                    // count the message
 				}
 			case *RequestStatus:
-				isglb.Logger.Debugf("Received a Status: %s", request.Status.String())
+				log.Debugf("Received a Status: %s", request.Status.String())
 				reportedStatus := request.Status
 				nid := reportedStatus.Key()
 
 				WhereToSend.Add(reportedStatus.Key(), msg.sigkey) // Save sig and nid
 
 				if lastStatus, ok := latestStatus[nid]; ok && lastStatus.Compare(reportedStatus) {
-					isglb.Logger.Debugf("Dropped deprecated SFU status from request: %s", lastStatus.String())
+					log.Debugf("Dropped deprecated SFU status from request: %s", lastStatus.String())
 					continue //filter out unchanged status
 				}
 				// If the request has changed
@@ -185,13 +181,13 @@ func (isglb *Service) routineStatusRecv() {
 		}
 		for nid, expectedStatus := range expectedStatusDict {
 			if lastStatus, ok := latestStatus[nid]; ok && lastStatus.Compare(expectedStatus) {
-				isglb.Logger.Debugf("Dropped deprecated SFU status from algorithm: %s", lastStatus.String())
+				log.Debugf("Dropped deprecated SFU status from algorithm: %s", lastStatus.String())
 				continue //filter out unchanged request
 			}
 			// If the request should be change
 			sigs := WhereToSend.GetSet(nid)
 			if len(sigs) <= 0 {
-				isglb.Logger.Warnf("No Status sender sig found for nid %s: %s", nid, expectedStatus.String())
+				log.Warnf("No Status sender sig found for nid %s: %s", nid, expectedStatus.String())
 				continue
 			}
 			isglb.sendChsMu.RLock()
@@ -199,14 +195,14 @@ func (isglb *Service) routineStatusRecv() {
 				sendCh <- expectedStatus           // Send it
 				latestStatus[nid] = expectedStatus // And Save it
 			} else {
-				isglb.Logger.Warnf("No Status sender channel found for nid %s: %s", nid, expectedStatus.String())
+				log.Warnf("No Status sender channel found for nid %s: %s", nid, expectedStatus.String())
 			}
 			isglb.sendChsMu.RUnlock()
 		}
 	}
 }
 
-func routineStatusSend(sig ServerConn, sendCh <-chan Status, logger *logrus.Logger) {
+func routineStatusSend(sig ServerConn, sendCh <-chan Status) {
 	latestStatusChs := make(map[string]chan Status)
 	defer func(latestStatusChs map[string]chan Status) {
 		for nid, ch := range latestStatusChs {
@@ -237,7 +233,7 @@ func routineStatusSend(sig ServerConn, sendCh <-chan Status, logger *logrus.Logg
 						if err == io.EOF {
 							return
 						}
-						logger.Errorf("%v SFU request send error", err)
+						log.Errorf("%v SFU request send error", err)
 					}
 				}
 			}(latestStatusCh)
