@@ -1,0 +1,17 @@
+github.com/d-ion/stream v0.0.0-20221202100529-d9ac5fd66d8c h1:HLgNHt3uuWHZU+oxm6tO5gdRE+uYga0qMb6W24MQBmk=
+github.com/d-ion/stream v0.0.0-20221202100529-d9ac5fd66d8c/go.mod h1:AVr+5za5wF6FjSPAjaRnGQhydLt7jYXY/3R+zQmcrek=
+github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/sirupsen/logrus v1.9.0/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
+github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
+github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
+github.com/yindaheng98/execlock v0.0.0-20221202092132-c655b6391182 h1:0OU/GMY7e1TEO5C+FcB3hrQxTkL2VNJmdYBpRzqvPb0=
+github.com/yindaheng98/execlock v0.0.0-20221202092132-c655b6391182/go.mod h1:nmPxfpVt90IFdKVkceIvGvPRcjUucadBUo/wHQk7WbA=
+github.com/yindaheng98/execlock v0.0.0-20221202095833-3900a5c9452f h1:kIpHrwao1Vg8U/MDVF/77kVnoXk81cZ9uN4CM3afYiw=
+github.com/yindaheng98/execlock v0.0.0-20221202095833-3900a5c9452f/go.mod h1:nmPxfpVt90IFdKVkceIvGvPRcjUucadBUo/wHQk7WbA=
+github.com/yindaheng98/setmap v0.0.0-20221202091203-d1447f189010 h1:Y5Co0H7OncADEttkzIkyqPzAM1RmGAxwq8Ui3ZBQVms=
+github.com/yindaheng98/setmap v0.0.0-20221202091203-d1447f189010/go.mod h1:9g1gLkTwy+eGg2IhurN58EaImexjIblxJq9/Dw4+VGw=
+golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
+gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
