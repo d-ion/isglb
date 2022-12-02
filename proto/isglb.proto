@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/d-ion/isglb/proto";
+
+package isglb;
+
+service ISGLB {
+  // When forward path changed, upload the SFUStatus from client to ISGLB
+  // When forward path should change, send expected SFUStatus from ISGLB to client
+  // Report the communication quality or computation quality of the edge
+  rpc SyncSFU(stream SyncRequest) returns (stream SFUStatus) {}
+}
+
+message Node {
+  string id = 1;
+  google.protobuf.Any info = 2;
+}
+
+message Subscription {
+  string TrackId = 1;
+  bool Mute = 2;
+  enum Layer {
+    Q = 0;
+    H = 1;
+    F = 2;
+  }
+  Layer layer = 3;
+}
+
+// The track in session `remoteSessionId` from `src` node was/should forwarded to local session `localSessionId`
+message ForwardTrack {
+  //  src + remoteSessionId is unique, use it as key
+  Node src = 1;
+  string remoteSessionId = 2; // The video/audio has session id in different nodes
+  string localSessionId = 3; // The video/audio has session id in different nodes
+  repeated Subscription tracks = 4;
+}
+
+// The track from srcSessionId was/should be proceeded and output track's session id is `dstSessionId`
+message ProceedTrack {
+  string dstSessionId = 1;
+  google.protobuf.Any procedure = 2; //src track should be proceeded by what kind of procedure
+  repeated string srcSessionIdList = 3;
+  //TODO: procedure should be more specific
+}
+
+// Which session do the client need. May be a lot of track in one session
+message ClientNeededSession {
+  string session = 1;
+  string user = 2;
+}
+
+// TODO: move SFUStatus to SFU module
+message SFUStatus {
+  Node SFU = 1;
+  repeated ForwardTrack forwardTracks = 2;
+  repeated ProceedTrack proceedTracks = 3;
+  repeated ClientNeededSession clients = 4;
+}
+
+message TransmissionReport {
+  Node src = 1;
+  Node dst = 2;
+  google.protobuf.Any report = 3; //TODO: Add a more specific Report type
+}
+
+message ComputationReport {
+  Node node = 1;
+  google.protobuf.Any report = 2; //TODO: Add a more specific Report type
+}
+
+message QualityReport {
+  google.protobuf.Timestamp timestamp = 1;
+  oneof report {
+    TransmissionReport transmission = 2;
+    ComputationReport computation = 3;
+  }
+}
+
+message SyncRequest {
+  oneof request {
+    SFUStatus status = 1;
+    QualityReport report = 2;
+  }
+}
