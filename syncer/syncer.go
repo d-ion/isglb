@@ -106,7 +106,7 @@ func (s *ISGLBSyncer) syncStatus(expectedStatus *pb.SFUStatus) {
 	}
 
 	// Check if the client needed Client is same
-	sessionIndexDataList := util.ClientNeededSessions(expectedStatus.Clients).ToDisorderSetItemList()
+	sessionIndexDataList := pb.ClientNeededSessions(expectedStatus.Clients).ToDisorderSetItemList()
 	if !s.clientSet.IsSame(sessionIndexDataList) { // Check if the ClientNeededSessions is same
 		// If not
 		isglb.GetLogger().Warnf("Received SFU status have different Client list, drop it: %s", expectedStatus.Clients)
@@ -115,7 +115,7 @@ func (s *ISGLBSyncer) syncStatus(expectedStatus *pb.SFUStatus) {
 	}
 
 	// Perform track forward change
-	forwardIndexDataList := util.ForwardTracks(expectedStatus.ForwardTracks).ToDisorderSetItemList()
+	forwardIndexDataList := pb.ForwardTracks(expectedStatus.ForwardTracks).ToDisorderSetItemList()
 	forwardAdd, forwardDel, forwardReplace := s.forwardTrackSet.Update(forwardIndexDataList)
 	for _, track := range forwardDel {
 		s.router.StopForwardTrack(track)
@@ -131,7 +131,7 @@ func (s *ISGLBSyncer) syncStatus(expectedStatus *pb.SFUStatus) {
 	}
 
 	//Perform track proceed change
-	proceedIndexDataList := util.ProceedTracks(expectedStatus.ProceedTracks).ToDisorderSetItemList()
+	proceedIndexDataList := pb.ProceedTracks(expectedStatus.ProceedTracks).ToDisorderSetItemList()
 	proceedAdd, proceedDel, proceedReplace := s.proceedTrackSet.Update(proceedIndexDataList)
 	for _, track := range proceedDel {
 		s.router.StopProceedTrack(track)
@@ -182,9 +182,9 @@ func (s *ISGLBSyncer) main() {
 			}
 			st := &pb.SFUStatus{
 				SFU:           proto.Clone(s.descSFU).(*pb.Node),
-				ForwardTracks: util.ForwardTrackItemList(s.forwardTrackSet.Sort()).ToForwardTracks(),
-				ProceedTracks: util.ProceedTrackItemList(s.proceedTrackSet.Sort()).ToProceedTracks(),
-				Clients:       util.ClientSessionItemList(s.clientSet.Sort()).ToClientSessions(),
+				ForwardTracks: pb.ForwardTrackItemList(s.forwardTrackSet.Sort()).ToForwardTracks(),
+				ProceedTracks: pb.ProceedTrackItemList(s.proceedTrackSet.Sort()).ToProceedTracks(),
+				Clients:       pb.ClientSessionItemList(s.clientSet.Sort()).ToClientSessions(),
 			} // should access Index, so keep single thread
 			go s.client.SendStatus(st)
 		}

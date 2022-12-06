@@ -8,60 +8,61 @@ import (
 	"github.com/yindaheng98/setmap"
 )
 
-type ServerConn interface {
+type ServerConn[ServerConnIDType comparable] interface {
+	setmap.IfaceSetMapItem[ServerConnIDType]
 	Send(Status) error
 	Recv() (Request, error)
 }
 
 // Service represents isglb node
-type Service struct {
+type Service[ServerConnIDType comparable] struct {
 	Alg Algorithm // The core algorithm
 
-	recvCh   chan isglbRecvMessage
+	recvCh   chan isglbRecvMessage[ServerConnIDType]
 	recvChMu *execlock.SingleExec
 
-	sendChs   map[ServerConn]chan Status
+	sendChs   map[ServerConnIDType]chan Status
 	sendChsMu *sync.RWMutex
 }
 
-func NewService(alg Algorithm) *Service {
+func NewService[T comparable](alg Algorithm) *Service[T] {
 	recvChMu := make(chan bool, 1)
 	recvChMu <- true
-	return &Service{
+	return &Service[T]{
 		Alg:       alg,
-		recvCh:    make(chan isglbRecvMessage, 4096),
+		recvCh:    make(chan isglbRecvMessage[T], 4096),
 		recvChMu:  execlock.NewSingleExec(),
-		sendChs:   make(map[ServerConn]chan Status),
+		sendChs:   make(map[T]chan Status),
 		sendChsMu: &sync.RWMutex{},
 	}
 }
 
 // isglbRecvMessage represents the message flow in Service.recvCh
 // the Status and a channel receive response
-type isglbRecvMessage struct {
+type isglbRecvMessage[T comparable] struct {
 	request Request
-	sigkey  ServerConn
-	deleted ServerConn
+	sigkey  ServerConn[T]
+	deleted ServerConn[T]
 }
 
 // Sync receive current Status, call the algorithm, and reply expected SFUStatus
-func (isglb *Service) Sync(sig ServerConn) error {
+func (isglb *Service[T]) Sync(sig ServerConn[T]) error {
 	skey := sig
-	defer func(skey ServerConn) {
+	defer func(skey ServerConn[T]) {
 		// 当连接断开的时候直接删除节点
-		isglb.recvCh <- isglbRecvMessage{
+		isglb.recvCh <- isglbRecvMessage[T]{
 			deleted: skey,
 		}
 	}(skey)
 	sendCh := make(chan Status)
 	isglb.sendChsMu.Lock()
-	isglb.sendChs[skey] = sendCh // Create send channel when begin
+	isglb.sendChs[skey.ID()] = sendCh // Create send channel when begin
 	isglb.sendChsMu.Unlock()
-	defer func(isglb *Service, skey ServerConn) {
+	defer func(isglb *Service[T], skey ServerConn[T]) {
 		isglb.sendChsMu.Lock()
-		if sendCh, ok := isglb.sendChs[skey]; ok {
+		if sendCh, ok := isglb.sendChs[skey.ID()]; ok {
 			close(sendCh)
-			delete(isglb.sendChs, skey) // delete send channel when exit
+			delete(isglb.sendChs, skey.ID()) // delete send channel when exit
 		}
 		isglb.sendChsMu.Unlock()
 	}(isglb, skey)
@@ -79,7 +80,7 @@ func (isglb *Service) Sync(sig ServerConn) error {
 			return err
 		}
 		// Push to receive channel
-		isglb.recvCh <- isglbRecvMessage{
+		isglb.recvCh <- isglbRecvMessage[T]{
 			request: req,
 			sigkey:  sig,
 		}
@@ -87,15 +88,15 @@ func (isglb *Service) Sync(sig ServerConn) error {
 }
 
 // routineStatusRecv should NOT run more than once
-func (isglb *Service) routineStatusRecv() {
-	WhereToSend := setmap.NewSetMapaMteS[string, ServerConn]()
+func (isglb *Service[T]) routineStatusRecv() {
+	WhereToSend := setmap.NewHalfIfaceSetMapaMteS[string, T]()
 	latestStatus := make(map[string]Status) // Just for filter out those unchanged Status
 	for {
 		var recvCount = 0
 		savedReports := make(map[string]Report) // Just for filter out those deprecated reports
 	L:
 		for {
-			var msg isglbRecvMessage
+			var msg isglbRecvMessage[T]
 			var ok bool
 			if recvCount <= 0 { //if there is no message
 				msg, ok = <-isglb.recvCh //wait for the first message
@@ -191,7 +192,7 @@ func (isglb *Service) routineStatusRecv() {
 				continue
 			}
 			isglb.sendChsMu.RLock()
-			if sendCh, ok := isglb.sendChs[sigs[0]]; ok {
+			if sendCh, ok := isglb.sendChs[sigs[0].ID()]; ok {
 				sendCh <- expectedStatus           // Send it
 				latestStatus[nid] = expectedStatus // And Save it
 			} else {
@@ -202,7 +203,7 @@ func (isglb *Service) routineStatusRecv() {
 	}
 }
 
-func routineStatusSend(sig ServerConn, sendCh <-chan Status) {
+func routineStatusSend[T comparable](sig ServerConn[T], sendCh <-chan Status) {
 	latestStatusChs := make(map[string]chan Status)
 	defer func(latestStatusChs map[string]chan Status) {
 		for nid, ch := range latestStatusChs {
