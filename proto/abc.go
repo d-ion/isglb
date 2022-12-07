@@ -1,4 +1,4 @@
-package isglb
+package proto
 
 type Status interface {
 	// Key return the key of this item

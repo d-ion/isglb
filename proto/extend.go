@@ -2,7 +2,6 @@ package proto
 
 import (
 	"fmt"
-	"github.com/d-ion/isglb"
 	"github.com/d-ion/isglb/util"
 	"google.golang.org/protobuf/proto"
 )
@@ -13,17 +12,17 @@ func (s *SFUStatus) Key() string {
 }
 
 // Compare implement isglb.Status.Compare
-func (s *SFUStatus) Compare(status isglb.Status) bool {
+func (s *SFUStatus) Compare(status Status) bool {
 	return s.String() == status.String()
 }
 
 // Clone implement isglb.Status.Clone
-func (s *SFUStatus) Clone() isglb.Status {
+func (s *SFUStatus) Clone() Status {
 	return proto.Clone(s).(*SFUStatus)
 }
 
 // Clone implement isglb.Report.Clone
-func (r *QualityReport) Clone() isglb.Report {
+func (r *QualityReport) Clone() Report {
 	return proto.Clone(r).(*QualityReport)
 }
 
@@ -41,11 +40,9 @@ func (i *ForwardTrack) Key() string {
 	return fmt.Sprintf("{ NID: %s, RemoteSessionId: %s }", i.Src.Id, i.RemoteSessionId)
 	// !!!重要!!!不允许多次转发同一个节点的同一个Session
 }
-
 func (i *ForwardTrack) Compare(data util.DisorderSetItem) bool {
 	return i.String() == data.(*ForwardTrack).String()
 }
-
 func (i *ForwardTrack) Clone() util.DisorderSetItem {
 	return proto.Clone(i).(*ForwardTrack)
 }
