@@ -67,8 +67,7 @@ func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.N
 		sessionEventCh: make(chan *SessionEvent, 1024),
 	}
 	s.statusSendCh <- true
-	isglbClient.OnStatusRecv = func(si Status) {
-		st := si.(*pb.SFUStatus)
+	isglbClient.OnStatusRecv = func(st *pb.SFUStatus) {
 		select {
 		case _, ok := <-s.statusRecvCh:
 			if !ok {
