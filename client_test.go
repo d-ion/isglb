@@ -1,44 +1,19 @@
 package isglb
 
 import (
-	"context"
-	"fmt"
 	"github.com/d-ion/isglb/algorithms/random"
 	pb "github.com/d-ion/isglb/proto"
-	"github.com/d-ion/stream"
 	"google.golang.org/protobuf/types/known/anypb"
 	"testing"
 	"time"
 )
 
-var id = 0
-
-type chanClientStreamFactory struct {
-	service *Service[*pb.SFUStatus]
-}
-
-func (c chanClientStreamFactory) NewClientStream(ctx context.Context) (stream.ClientStream[pb.Request, *pb.SFUStatus], error) {
-	id++
-	server, client := NewChanCSPair[*pb.SFUStatus](fmt.Sprintf("%04d", id))
-	go func() {
-		err := c.service.Sync(server)
-		if err != nil {
-			select {
-			case <-ctx.Done():
-			default:
-				panic(err)
-			}
-		}
-	}()
-	return client, nil
-}
-
 func TestClient(t *testing.T) {
-	client := NewClient[*pb.SFUStatus, *pb.QualityReport](chanClientStreamFactory{
-		service: NewService[*pb.SFUStatus](
+	client := NewClient[*pb.SFUStatus, *pb.QualityReport](NewChanClientStreamFactory[*pb.SFUStatus](
+		NewService[*pb.SFUStatus](
 			pb.AlgorithmWrapper{ProtobufAlgorithm: &random.Random{RandomTrack: true}},
 		),
-	})
+	))
 	client.OnStatusRecv = func(s *pb.SFUStatus) {
 		t.Logf("Received %+v", s)
 	}

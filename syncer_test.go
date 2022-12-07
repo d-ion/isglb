@@ -53,11 +53,11 @@ func (t TestSessionTracker) FetchSessionEvent() *SessionEvent {
 func TestSyncer(t *testing.T) {
 	log.SetLevel(logrus.DebugLevel)
 	syncer := NewSFUStatusSyncer(
-		chanClientStreamFactory{
-			service: NewService[*pb.SFUStatus](
+		NewChanClientStreamFactory[*pb.SFUStatus](
+			NewService[*pb.SFUStatus](
 				pb.AlgorithmWrapper{ProtobufAlgorithm: &random.Random{RandomTrack: true}},
 			),
-		},
+		),
 		&pb.Node{Id: "test"},
 		ToolBox{
 			TransmissionReporter: TestTransmissionReporter{random.RandTransmissionReport{}},

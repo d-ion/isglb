@@ -1,6 +1,8 @@
 package isglb
 
 import (
+	"context"
+	"fmt"
 	"github.com/d-ion/isglb/proto"
 	"github.com/d-ion/stream"
 )
@@ -51,4 +53,30 @@ func NewChanCSPair[S proto.Status](id string) (ServerConn[S], stream.ClientStrea
 		s2c: make(chan S, 16),
 	}
 	return ChanServerConn[S]{id: id, cp: cp}, ChanClientStream[S]{cp: cp}
+}
+
+var id = 0
+
+type ChanClientStreamFactory[S proto.Status] struct {
+	service *Service[S]
+}
+
+func NewChanClientStreamFactory[S proto.Status](service *Service[S]) ChanClientStreamFactory[S] {
+	return ChanClientStreamFactory[S]{service: service}
+}
+
+func (c ChanClientStreamFactory[S]) NewClientStream(ctx context.Context) (stream.ClientStream[proto.Request, S], error) {
+	id++
+	server, client := NewChanCSPair[S](fmt.Sprintf("%04d", id))
+	go func() {
+		err := c.service.Sync(server)
+		if err != nil {
+			select {
+			case <-ctx.Done():
+			default:
+				panic(err)
+			}
+		}
+	}()
+	return client, nil
 }
