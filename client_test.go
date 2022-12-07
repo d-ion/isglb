@@ -3,7 +3,7 @@ package isglb
 import (
 	"context"
 	"fmt"
-	"github.com/d-ion/isglb/algorithms/impl/random"
+	"github.com/d-ion/isglb/algorithms/random"
 	pb "github.com/d-ion/isglb/proto"
 	"github.com/d-ion/stream"
 	"google.golang.org/protobuf/types/known/anypb"

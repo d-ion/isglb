@@ -1,7 +1,7 @@
 package isglb
 
 import (
-	"github.com/d-ion/isglb/algorithms/impl/random"
+	"github.com/d-ion/isglb/algorithms/random"
 	pb "github.com/d-ion/isglb/proto"
 	"github.com/sirupsen/logrus"
 	"math/rand"
