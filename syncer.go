@@ -7,8 +7,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Syncer is a Client to sync SFUStatus
-type Syncer struct {
+// SFUStatusSyncer is a Client to sync SFUStatus
+type SFUStatusSyncer struct {
 	client  *Client[*pb.SFUStatus, *pb.QualityReport]
 	descSFU *pb.Node
 
@@ -26,7 +26,7 @@ type Syncer struct {
 	sessionEventCh chan *SessionEvent
 }
 
-func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.Node, toolbox ToolBox) *Syncer {
+func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.Node, toolbox ToolBox) *SFUStatusSyncer {
 	isglbClient := NewClient[*pb.SFUStatus, *pb.QualityReport](factory)
 	if isglbClient == nil {
 		return nil
@@ -48,7 +48,7 @@ func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.N
 	if cr == nil {
 		cr = &syncer.StupidComputationReporter{}
 	}
-	s := &Syncer{
+	s := &SFUStatusSyncer{
 		client:  isglbClient,
 		descSFU: myself,
 
@@ -85,7 +85,7 @@ func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.N
 	return s
 }
 
-func (s *Syncer) NotifySFUStatus() {
+func (s *SFUStatusSyncer) NotifySFUStatus() {
 	// Only send latest status
 	select {
 	case s.statusSendCh <- true:
@@ -97,7 +97,7 @@ func (s *Syncer) NotifySFUStatus() {
 
 // syncStatus sync the current SFUStatus with the expected SFUStatus
 // MUST be single threaded
-func (s *Syncer) syncStatus(expectedStatus *pb.SFUStatus) {
+func (s *SFUStatusSyncer) syncStatus(expectedStatus *pb.SFUStatus) {
 	if expectedStatus.SFU.String() != s.descSFU.String() { // Check if the SFU status is mine
 		// If not
 		log.Warnf("Received SFU status is not mine, drop it: %s", expectedStatus.SFU)
@@ -149,7 +149,7 @@ func (s *Syncer) syncStatus(expectedStatus *pb.SFUStatus) {
 
 // handleSessionEvent handle the SessionEvent
 // MUST be single threaded
-func (s *Syncer) handleSessionEvent(event *SessionEvent) {
+func (s *SFUStatusSyncer) handleSessionEvent(event *SessionEvent) {
 	// Just add or remove it, and sand latest status
 	switch event.State {
 	case SessionEvent_ADD:
@@ -163,7 +163,7 @@ func (s *Syncer) handleSessionEvent(event *SessionEvent) {
 
 // main is the "main function" goroutine of the NewSFUStatusSyncer
 // All the methods about Index should be here, to ensure the assess is single-threaded
-func (s *Syncer) main() {
+func (s *SFUStatusSyncer) main() {
 	for {
 		select {
 		case event, ok := <-s.sessionEventCh: // handle an event
@@ -193,7 +193,7 @@ func (s *Syncer) main() {
 
 // ↑↑↑↑↑ should access Index, so keep single thread ↑↑↑↑↑
 
-func (s *Syncer) sessionFetcher() {
+func (s *SFUStatusSyncer) sessionFetcher() {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Debugf("error on close: %+v", err)
@@ -208,7 +208,7 @@ func (s *Syncer) sessionFetcher() {
 	}
 }
 
-func (s *Syncer) reportFetcher() {
+func (s *SFUStatusSyncer) reportFetcher() {
 	for {
 		report := s.reporter.FetchReport()
 		if report == nil {
@@ -218,14 +218,14 @@ func (s *Syncer) reportFetcher() {
 	}
 }
 
-func (s *Syncer) Start() {
+func (s *SFUStatusSyncer) Start() {
 	go s.main()
 	go s.reportFetcher()
 	go s.sessionFetcher()
 	s.client.Connect()
 }
 
-func (s *Syncer) Stop() {
+func (s *SFUStatusSyncer) Stop() {
 	s.client.Close()
 	close(s.statusRecvCh)
 	close(s.statusSendCh)
