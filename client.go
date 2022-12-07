@@ -2,16 +2,19 @@ package isglb
 
 import (
 	"context"
+	"github.com/d-ion/isglb/proto"
 	"github.com/d-ion/stream"
 	"github.com/yindaheng98/execlock"
 )
 
-type ClientStreamFactory[S Status] interface {
-	NewClientStream(ctx context.Context) (stream.ClientStream[Request, S], error)
+// ClientStreamFactory for stream.Client. Generate stream.ClientStream for reconnect
+type ClientStreamFactory[S proto.Status] interface {
+	NewClientStream(ctx context.Context) (stream.ClientStream[proto.Request, S], error)
 }
 
-type Client[S Status, R Report] struct {
-	*stream.Client[Request, S]
+// Client for send/recv Status/Report
+type Client[S proto.Status, R proto.Report] struct {
+	*stream.Client[proto.Request, S]
 	ctxTop    context.Context
 	cancelTop context.CancelFunc
 
@@ -19,13 +22,13 @@ type Client[S Status, R Report] struct {
 
 	cancelLast context.CancelFunc
 
-	OnStatusRecv func(s Status)
+	OnStatusRecv func(s proto.Status)
 }
 
-func NewClient[S Status, R Report](factory ClientStreamFactory[S]) *Client[S, R] {
+func NewClient[S proto.Status, R proto.Report](factory ClientStreamFactory[S]) *Client[S, R] {
 	ctx, cancal := context.WithCancel(context.Background())
 	c := &Client[S, R]{
-		Client:         stream.NewClient[Request, S](factory),
+		Client:         stream.NewClient[proto.Request, S](factory),
 		ctxTop:         ctx,
 		cancelTop:      cancal,
 		sendStatusExec: &execlock.SingleLatestExec{},
@@ -40,8 +43,8 @@ func NewClient[S Status, R Report](factory ClientStreamFactory[S]) *Client[S, R]
 
 // SendReport send the report, maybe lose when cannot connect
 func (c *Client[S, R]) SendReport(report R) {
-	c.DoWithClient(func(client stream.ClientStream[Request, S]) error {
-		err := client.Send(&RequestReport{Report: report})
+	c.DoWithClient(func(client stream.ClientStream[proto.Request, S]) error { // Just run it
+		err := client.Send(&proto.RequestReport{Report: report})
 		if err != nil {
 			log.Errorf("Report send error: %+v", err)
 			return err
@@ -52,7 +55,7 @@ func (c *Client[S, R]) SendReport(report R) {
 
 // SendStatus send the Status, if there is a new status should be sent, the last send will be canceled
 func (c *Client[S, R]) SendStatus(status S) {
-	c.sendStatusExec.Do(func(ctx context.Context) {
+	c.sendStatusExec.Do(func(ctx context.Context) { // Run until success
 		for {
 			select {
 			case <-c.ctxTop.Done():
@@ -61,8 +64,8 @@ func (c *Client[S, R]) SendStatus(status S) {
 				return
 			default:
 			}
-			ok := c.DoWithClient(func(client stream.ClientStream[Request, S]) error {
-				err := client.Send(&RequestStatus{Status: status})
+			ok := c.DoWithClient(func(client stream.ClientStream[proto.Request, S]) error {
+				err := client.Send(&proto.RequestStatus{Status: status})
 				if err != nil {
 					log.Errorf("Status send error: %+v", err)
 					return err
