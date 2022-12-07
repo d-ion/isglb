@@ -1,6 +1,7 @@
 package isglb
 
 import (
+	"github.com/d-ion/isglb/proto"
 	"io"
 	"sync"
 
@@ -8,49 +9,49 @@ import (
 	"github.com/yindaheng98/setmap"
 )
 
-type ServerConn[ServerConnIDType comparable, S Status] interface {
-	setmap.IfaceSetMapItem[ServerConnIDType]
+type ServerConn[S proto.Status] interface {
+	setmap.IfaceSetMapItem[string]
 	Send(S) error
-	Recv() (Request, error)
+	Recv() (proto.Request, error)
 }
 
 // Service represents isglb node
-type Service[T comparable, S Status] struct {
-	Alg Algorithm // The core algorithm
+type Service[S proto.Status] struct {
+	Alg proto.Algorithm // The core algorithm
 
-	recvCh   chan isglbRecvMessage[T, S]
+	recvCh   chan isglbRecvMessage[S]
 	recvChMu *execlock.SingleExec
 
-	sendChs   map[T]chan S
+	sendChs   map[string]chan S
 	sendChsMu *sync.RWMutex
 }
 
-func NewService[T comparable, S Status](alg Algorithm) *Service[T, S] {
+func NewService[S proto.Status](alg proto.Algorithm) *Service[S] {
 	recvChMu := make(chan bool, 1)
 	recvChMu <- true
-	return &Service[T, S]{
+	return &Service[S]{
 		Alg:       alg,
-		recvCh:    make(chan isglbRecvMessage[T, S], 4096),
+		recvCh:    make(chan isglbRecvMessage[S], 4096),
 		recvChMu:  execlock.NewSingleExec(),
-		sendChs:   make(map[T]chan S),
+		sendChs:   make(map[string]chan S),
 		sendChsMu: &sync.RWMutex{},
 	}
 }
 
 // isglbRecvMessage represents the message flow in Service.recvCh
 // the Status and a channel receive response
-type isglbRecvMessage[T comparable, S Status] struct {
-	request Request
-	sigkey  ServerConn[T, S]
-	deleted ServerConn[T, S]
+type isglbRecvMessage[S proto.Status] struct {
+	request proto.Request
+	sigkey  ServerConn[S]
+	deleted ServerConn[S]
 }
 
 // Sync receive current Status, call the algorithm, and reply expected SFUStatus
-func (isglb *Service[T, S]) Sync(sig ServerConn[T, S]) error {
+func (isglb *Service[S]) Sync(sig ServerConn[S]) error {
 	skey := sig
-	defer func(skey ServerConn[T, S]) {
+	defer func(skey ServerConn[S]) {
 		// 当连接断开的时候直接删除节点
-		isglb.recvCh <- isglbRecvMessage[T, S]{
+		isglb.recvCh <- isglbRecvMessage[S]{
 			deleted: skey,
 		}
 	}(skey)
@@ -58,7 +59,7 @@ func (isglb *Service[T, S]) Sync(sig ServerConn[T, S]) error {
 	isglb.sendChsMu.Lock()
 	isglb.sendChs[skey.ID()] = sendCh // Create send channel when begin
 	isglb.sendChsMu.Unlock()
-	defer func(isglb *Service[T, S], skey ServerConn[T, S]) {
+	defer func(isglb *Service[S], skey ServerConn[S]) {
 		isglb.sendChsMu.Lock()
 		if sendCh, ok := isglb.sendChs[skey.ID()]; ok {
 			close(sendCh)
@@ -80,7 +81,7 @@ func (isglb *Service[T, S]) Sync(sig ServerConn[T, S]) error {
 			return err
 		}
 		// Push to receive channel
-		isglb.recvCh <- isglbRecvMessage[T, S]{
+		isglb.recvCh <- isglbRecvMessage[S]{
 			request: req,
 			sigkey:  sig,
 		}
@@ -88,15 +89,15 @@ func (isglb *Service[T, S]) Sync(sig ServerConn[T, S]) error {
 }
 
 // routineStatusRecv should NOT run more than once
-func (isglb *Service[T, S]) routineStatusRecv() {
-	WhereToSend := setmap.NewHalfIfaceSetMapaMteS[string, T]()
-	latestStatus := make(map[string]Status) // Just for filter out those unchanged Status
+func (isglb *Service[S]) routineStatusRecv() {
+	WhereToSend := setmap.NewHalfIfaceSetMapaMteS[string, string]()
+	latestStatus := make(map[string]proto.Status) // Just for filter out those unchanged Status
 	for {
 		var recvCount = 0
-		savedReports := make(map[string]Report) // Just for filter out those deprecated reports
+		savedReports := make(map[string]proto.Report) // Just for filter out those deprecated reports
 	L:
 		for {
-			var msg isglbRecvMessage[T, S]
+			var msg isglbRecvMessage[S]
 			var ok bool
 			if recvCount <= 0 { //if there is no message
 				msg, ok = <-isglb.recvCh //wait for the first message
@@ -133,13 +134,13 @@ func (isglb *Service[T, S]) routineStatusRecv() {
 			}
 			//category and save messages
 			switch request := msg.request.(type) {
-			case *RequestReport:
+			case *proto.RequestReport:
 				log.Debugf("Received a QualityReport: %s", request.Report.String())
 				if _, ok = savedReports[request.Report.String()]; !ok { //filter out deprecated report
 					savedReports[request.Report.String()] = request.Report.Clone() // Save the copy
 					recvCount++                                                    // count the message
 				}
-			case *RequestStatus:
+			case *proto.RequestStatus:
 				log.Debugf("Received a Status: %s", request.Status.String())
 				reportedStatus := request.Status
 				nid := reportedStatus.Key()
@@ -162,14 +163,14 @@ func (isglb *Service[T, S]) routineStatusRecv() {
 		}
 
 		var i int
-		statuss := make([]Status, len(latestStatus))
+		statuss := make([]proto.Status, len(latestStatus))
 		i = 0
 		for _, s := range latestStatus {
 			statuss[i] = s.Clone()
 			i++
 		}
 		i = 0
-		reports := make([]Report, len(savedReports))
+		reports := make([]proto.Report, len(savedReports))
 		for _, r := range savedReports {
 			reports[i] = r
 			i++
@@ -203,7 +204,7 @@ func (isglb *Service[T, S]) routineStatusRecv() {
 	}
 }
 
-func routineStatusSend[T comparable, S Status](sig ServerConn[T, S], sendCh <-chan S) {
+func routineStatusSend[S proto.Status](sig ServerConn[S], sendCh <-chan S) {
 	latestStatusChs := make(map[string]chan S)
 	defer func(latestStatusChs map[string]chan S) {
 		for nid, ch := range latestStatusChs {

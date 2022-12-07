@@ -22,7 +22,7 @@ type Client[S proto.Status, R proto.Report] struct {
 
 	cancelLast context.CancelFunc
 
-	OnStatusRecv func(s proto.Status)
+	OnStatusRecv func(s S)
 }
 
 func NewClient[S proto.Status, R proto.Report](factory ClientStreamFactory[S]) *Client[S, R] {
