@@ -2,7 +2,6 @@ package isglb
 
 import (
 	pb "github.com/d-ion/isglb/proto"
-	"github.com/d-ion/isglb/syncer"
 	"github.com/d-ion/isglb/util"
 	"google.golang.org/protobuf/proto"
 )
@@ -33,20 +32,20 @@ func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.N
 	}
 	forwarder, processor, session := toolbox.TrackForwarder, toolbox.TrackProcessor, toolbox.SessionTracker
 	if forwarder == nil {
-		forwarder = syncer.StupidTrackForwarder{}
+		forwarder = StupidTrackForwarder{}
 	}
 	if processor == nil {
-		processor = syncer.StupidTrackProcesser{}
+		processor = StupidTrackProcesser{}
 	}
 	if session == nil {
-		session = syncer.StupidSessionTracker{}
+		session = StupidSessionTracker{}
 	}
 	tr, cr := toolbox.TransmissionReporter, toolbox.ComputationReporter
 	if tr == nil {
-		tr = &syncer.StupidTransmissionReporter{}
+		tr = &StupidTransmissionReporter{}
 	}
 	if cr == nil {
-		cr = &syncer.StupidComputationReporter{}
+		cr = &StupidComputationReporter{}
 	}
 	s := &SFUStatusSyncer{
 		client:  isglbClient,
