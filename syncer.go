@@ -1,15 +1,15 @@
-package syncer
+package isglb
 
 import (
-	"github.com/d-ion/isglb"
 	pb "github.com/d-ion/isglb/proto"
+	"github.com/d-ion/isglb/syncer"
 	"github.com/d-ion/isglb/util"
 	"google.golang.org/protobuf/proto"
 )
 
 // ISGLBSyncer is a Client to sync SFUStatus
 type ISGLBSyncer struct {
-	client  *isglb.Client[*pb.SFUStatus, *pb.QualityReport]
+	client  *Client[*pb.SFUStatus, *pb.QualityReport]
 	descSFU *pb.Node
 
 	router   trackRouter
@@ -26,27 +26,27 @@ type ISGLBSyncer struct {
 	sessionEventCh chan *SessionEvent
 }
 
-func NewSFUStatusSyncer(factory isglb.ClientStreamFactory[*pb.SFUStatus], myself *pb.Node, toolbox ToolBox) *ISGLBSyncer {
-	isglbClient := isglb.NewClient[*pb.SFUStatus, *pb.QualityReport](factory)
+func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.Node, toolbox ToolBox) *ISGLBSyncer {
+	isglbClient := NewClient[*pb.SFUStatus, *pb.QualityReport](factory)
 	if isglbClient == nil {
 		return nil
 	}
 	forwarder, processor, session := toolbox.TrackForwarder, toolbox.TrackProcessor, toolbox.SessionTracker
 	if forwarder == nil {
-		forwarder = StupidTrackForwarder{}
+		forwarder = syncer.StupidTrackForwarder{}
 	}
 	if processor == nil {
-		processor = StupidTrackProcesser{}
+		processor = syncer.StupidTrackProcesser{}
 	}
 	if session == nil {
-		session = StupidSessionTracker{}
+		session = syncer.StupidSessionTracker{}
 	}
 	tr, cr := toolbox.TransmissionReporter, toolbox.ComputationReporter
 	if tr == nil {
-		tr = &StupidTransmissionReporter{}
+		tr = &syncer.StupidTransmissionReporter{}
 	}
 	if cr == nil {
-		cr = &StupidComputationReporter{}
+		cr = &syncer.StupidComputationReporter{}
 	}
 	s := &ISGLBSyncer{
 		client:  isglbClient,
@@ -68,7 +68,7 @@ func NewSFUStatusSyncer(factory isglb.ClientStreamFactory[*pb.SFUStatus], myself
 		sessionEventCh: make(chan *SessionEvent, 1024),
 	}
 	s.statusSendCh <- true
-	isglbClient.OnStatusRecv = func(si isglb.Status) {
+	isglbClient.OnStatusRecv = func(si Status) {
 		st := si.(*pb.SFUStatus)
 		select {
 		case _, ok := <-s.statusRecvCh:
@@ -100,7 +100,7 @@ func (s *ISGLBSyncer) NotifySFUStatus() {
 func (s *ISGLBSyncer) syncStatus(expectedStatus *pb.SFUStatus) {
 	if expectedStatus.SFU.String() != s.descSFU.String() { // Check if the SFU status is mine
 		// If not
-		isglb.GetLogger().Warnf("Received SFU status is not mine, drop it: %s", expectedStatus.SFU)
+		GetLogger().Warnf("Received SFU status is not mine, drop it: %s", expectedStatus.SFU)
 		s.NotifySFUStatus() // The server must re-consider the status for our SFU
 		return              // And we should wait for the right SFU status to come
 	}
@@ -109,7 +109,7 @@ func (s *ISGLBSyncer) syncStatus(expectedStatus *pb.SFUStatus) {
 	sessionIndexDataList := pb.ClientNeededSessions(expectedStatus.Clients).ToDisorderSetItemList()
 	if !s.clientSet.IsSame(sessionIndexDataList) { // Check if the ClientNeededSessions is same
 		// If not
-		isglb.GetLogger().Warnf("Received SFU status have different Client list, drop it: %s", expectedStatus.Clients)
+		GetLogger().Warnf("Received SFU status have different Client list, drop it: %s", expectedStatus.Clients)
 		s.NotifySFUStatus() // The server must re-consider the status for our SFU
 		return              // And we should wait for the right SFU status to come
 	}
@@ -196,7 +196,7 @@ func (s *ISGLBSyncer) main() {
 func (s *ISGLBSyncer) sessionFetcher() {
 	defer func() {
 		if err := recover(); err != nil {
-			isglb.GetLogger().Debugf("error on close: %+v", err)
+			GetLogger().Debugf("error on close: %+v", err)
 		}
 	}()
 	for {

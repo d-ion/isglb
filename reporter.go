@@ -1,4 +1,4 @@
-package syncer
+package isglb
 
 import (
 	pb "github.com/d-ion/isglb/proto"
