@@ -6,14 +6,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"math/rand"
 
-	"github.com/d-ion/isglb"
 	pb "github.com/d-ion/isglb/proto"
 	"github.com/golang/protobuf/ptypes/timestamp"
 )
 
 // Random is a node selection algorithm, just for test
 type Random struct {
-	isglb.Algorithm
 	nodes       map[string]*pb.SFUStatus
 	RandomTrack bool
 }
