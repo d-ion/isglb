@@ -21,6 +21,7 @@ func (c ChanServerConn[S]) ID() string {
 }
 
 func (c ChanServerConn[S]) Send(status S) error {
+	log.Debugf("S->C Sending %+v", status)
 	c.cp.s2c <- status
 	return nil
 }
@@ -35,6 +36,7 @@ type ChanClientStream[S proto.Status] struct {
 }
 
 func (c ChanClientStream[S]) Send(request proto.Request) error {
+	log.Debugf("C->S Sending %+v", request)
 	c.cp.c2s <- request
 	return nil
 }
