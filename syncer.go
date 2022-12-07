@@ -7,8 +7,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// ISGLBSyncer is a Client to sync SFUStatus
-type ISGLBSyncer struct {
+// Syncer is a Client to sync SFUStatus
+type Syncer struct {
 	client  *Client[*pb.SFUStatus, *pb.QualityReport]
 	descSFU *pb.Node
 
@@ -26,7 +26,7 @@ type ISGLBSyncer struct {
 	sessionEventCh chan *SessionEvent
 }
 
-func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.Node, toolbox ToolBox) *ISGLBSyncer {
+func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.Node, toolbox ToolBox) *Syncer {
 	isglbClient := NewClient[*pb.SFUStatus, *pb.QualityReport](factory)
 	if isglbClient == nil {
 		return nil
@@ -48,7 +48,7 @@ func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.N
 	if cr == nil {
 		cr = &syncer.StupidComputationReporter{}
 	}
-	s := &ISGLBSyncer{
+	s := &Syncer{
 		client:  isglbClient,
 		descSFU: myself,
 
@@ -85,7 +85,7 @@ func NewSFUStatusSyncer(factory ClientStreamFactory[*pb.SFUStatus], myself *pb.N
 	return s
 }
 
-func (s *ISGLBSyncer) NotifySFUStatus() {
+func (s *Syncer) NotifySFUStatus() {
 	// Only send latest status
 	select {
 	case s.statusSendCh <- true:
@@ -97,10 +97,10 @@ func (s *ISGLBSyncer) NotifySFUStatus() {
 
 // syncStatus sync the current SFUStatus with the expected SFUStatus
 // MUST be single threaded
-func (s *ISGLBSyncer) syncStatus(expectedStatus *pb.SFUStatus) {
+func (s *Syncer) syncStatus(expectedStatus *pb.SFUStatus) {
 	if expectedStatus.SFU.String() != s.descSFU.String() { // Check if the SFU status is mine
 		// If not
-		GetLogger().Warnf("Received SFU status is not mine, drop it: %s", expectedStatus.SFU)
+		log.Warnf("Received SFU status is not mine, drop it: %s", expectedStatus.SFU)
 		s.NotifySFUStatus() // The server must re-consider the status for our SFU
 		return              // And we should wait for the right SFU status to come
 	}
@@ -109,7 +109,7 @@ func (s *ISGLBSyncer) syncStatus(expectedStatus *pb.SFUStatus) {
 	sessionIndexDataList := pb.ClientNeededSessions(expectedStatus.Clients).ToDisorderSetItemList()
 	if !s.clientSet.IsSame(sessionIndexDataList) { // Check if the ClientNeededSessions is same
 		// If not
-		GetLogger().Warnf("Received SFU status have different Client list, drop it: %s", expectedStatus.Clients)
+		log.Warnf("Received SFU status have different Client list, drop it: %s", expectedStatus.Clients)
 		s.NotifySFUStatus() // The server must re-consider the status for our SFU
 		return              // And we should wait for the right SFU status to come
 	}
@@ -149,7 +149,7 @@ func (s *ISGLBSyncer) syncStatus(expectedStatus *pb.SFUStatus) {
 
 // handleSessionEvent handle the SessionEvent
 // MUST be single threaded
-func (s *ISGLBSyncer) handleSessionEvent(event *SessionEvent) {
+func (s *Syncer) handleSessionEvent(event *SessionEvent) {
 	// Just add or remove it, and sand latest status
 	switch event.State {
 	case SessionEvent_ADD:
@@ -163,7 +163,7 @@ func (s *ISGLBSyncer) handleSessionEvent(event *SessionEvent) {
 
 // main is the "main function" goroutine of the NewSFUStatusSyncer
 // All the methods about Index should be here, to ensure the assess is single-threaded
-func (s *ISGLBSyncer) main() {
+func (s *Syncer) main() {
 	for {
 		select {
 		case event, ok := <-s.sessionEventCh: // handle an event
@@ -193,10 +193,10 @@ func (s *ISGLBSyncer) main() {
 
 // ↑↑↑↑↑ should access Index, so keep single thread ↑↑↑↑↑
 
-func (s *ISGLBSyncer) sessionFetcher() {
+func (s *Syncer) sessionFetcher() {
 	defer func() {
 		if err := recover(); err != nil {
-			GetLogger().Debugf("error on close: %+v", err)
+			log.Debugf("error on close: %+v", err)
 		}
 	}()
 	for {
@@ -208,7 +208,7 @@ func (s *ISGLBSyncer) sessionFetcher() {
 	}
 }
 
-func (s *ISGLBSyncer) reportFetcher() {
+func (s *Syncer) reportFetcher() {
 	for {
 		report := s.reporter.FetchReport()
 		if report == nil {
@@ -218,14 +218,14 @@ func (s *ISGLBSyncer) reportFetcher() {
 	}
 }
 
-func (s *ISGLBSyncer) Start() {
+func (s *Syncer) Start() {
 	go s.main()
 	go s.reportFetcher()
 	go s.sessionFetcher()
 	s.client.Connect()
 }
 
-func (s *ISGLBSyncer) Stop() {
+func (s *Syncer) Stop() {
 	s.client.Close()
 	close(s.statusRecvCh)
 	close(s.statusSendCh)
